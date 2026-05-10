@@ -3,10 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "bin": {
+    "telltale": "./bin/telltale"
+  },
   "scripts": {
     "hook": "tsx src/hook.ts",
     "setup": "tsx src/setup.ts",
     "analyze": "tsx src/analyzer.ts",
+    "promote": "tsx src/cli.ts promote",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { LEARNINGS_FILE, MEMORY_ROOT, POTENTIAL_FILE } from "./memory.ts";
+import { LEARNINGS_FILE, MEMORY_ROOT, POTENTIAL_FILE, TELLTALE_BIN } from "./memory.ts";
 
 const STATE_DIR = join(homedir(), ".claude", "cache", "telltale");
 const ANALYZER_LOG = join(STATE_DIR, "analyzer.log");
@@ -57,16 +57,19 @@ DO NOT modify the # heading line. DO NOT touch any other file.
 # Two-stage flow
 Most observations go to potential-learnings.md FIRST, not learnings.md. A single conversation is weak evidence — a stated preference might be project-specific (e.g. "no Bun" might mean "no Bun for this project," not "user always avoids Bun").
 
-## Promotion criteria (potential → learnings)
-Promote an entry from potential-learnings.md to learnings.md when ANY of:
+## Promotion criteria (potential → ready for user review)
+An entry is READY for the user to confirm when ANY of:
 - Observed in ≥2 different projects (cross-project = likely generic).
 - Observed ≥3 times across distinct sessions.
 - User explicitly confirms it as a general preference.
+
+You DO NOT promote entries directly to ${LEARNINGS_FILE}. Promotion is gated on user approval. Instead, see "Pending review block" below.
 
 ## Removal criteria (potential)
 Drop an entry from potential-learnings.md when:
 - It's been contradicted by a later observation.
 - It's gone stale (no new observations across many sessions and never promoted).
+- Its \`Status\` is \`rejected\` (the user already declined it). LEAVE rejected entries in place — DO NOT re-stage them as new entries either.
 
 ## Step 1 — extract candidate observations from transcript
 Look for DURABLE, NON-OBVIOUS signals:
@@ -89,17 +92,62 @@ For each candidate routed here:
 Entry format:
 \`\`\`
 ### <short title>
-- Statement: <one line, the candidate rule>
+- Statement: <one line, written as a future-behavior directive for Claude, NOT as an observation about the user. Use imperative voice. ≤140 chars.>
 - Count: <integer>
 - Contexts:
   - ${today} — project: <cwd basename> — <brief: where in the conversation this came up, ≤80 chars>
 - Status: potential
 \`\`\`
 
-If an existing potential entry's promotion criteria are NOW met, MOVE it to learnings.md (delete from potential, add to confirmed) and note in the commit message.
+GOOD Statements (directive, imperative, future-Claude-facing):
+- "When starting a new feature or project, lead with concept/architecture discussion and tradeoffs before writing code."
+- "Default to terse responses; skip trailing summaries unless asked."
+- "Use Node + tsx; do not introduce Bun without explicit user request."
 
-## Step 4 — update learnings.md
-Bullet list under the heading. Each entry: short rule (≤120 chars). Add parenthetical "(why: …)" only when the reason is non-obvious. Total body ≤50 lines. PREFER UPDATE/REFINE over ADD. REMOVE entries contradicted by the transcript. Every char here is loaded into every future session — be ruthless.
+BAD Statements (observational, user-profiling):
+- "User prefers concept discussions before code." → rewrite as directive
+- "User dislikes long summaries." → rewrite as "Skip trailing summaries unless asked."
+- "User said no Bun." → rewrite as directive (and only if context suggests it's general, not project-specific)
+
+If an existing potential entry's promotion criteria are NOW met, do NOT move it to learnings.md. Instead, refresh the pending-review block (Step 4) so the user gets prompted on their next session.
+
+## Step 4 — pending-review block in learnings.md
+Find the candidates whose promotion criteria are met (potential entries with enough evidence, NOT \`Status: rejected\`). If there are any, write/refresh a single block at the very top of ${LEARNINGS_FILE}:
+
+\`\`\`
+<!-- telltale:pending-review -->
+> NOTE TO CLAUDE: telltale (the local memory tool) has pending learnings awaiting user confirmation.
+>
+> Timing — DO NOT bring it up immediately. Wait until:
+> - the user is not mid-task or actively working through a request, AND
+> - either the current topic relates to the candidate, OR the conversation has reached a natural pause (between tasks, after a question is resolved).
+> Never derail an active workflow.
+>
+> Framing — when you do bring it up:
+> 1. Attribute it briefly to **telltale** so the user knows the source ("telltale noticed…", "from telltale…"). One short phrase.
+> 2. Phrase the change in YOUR OWN VOICE as the new default behavior you'd adopt — what you'll start doing differently. NOT a recitation of the candidate text. One sentence.
+> 3. Combined example: "Quick aside — telltale noticed you tend to open new work with a concept discussion. Want me to default to that — talking through approach and tradeoffs before writing code?"
+> 4. Ask for a yes / skip. The user can also reject specific items.
+>
+> On any affirmative, run (do NOT edit files yourself):
+>     ${TELLTALE_BIN} promote "<short instruction naming what to promote and/or reject>"
+> The command handles file mutations + git commit.
+>
+> On decline, do not run the command and do not bring it up again this session.
+>
+> Pending:
+> - **<title>**: <statement> (seen in <N> projects, <M> sessions)
+<!-- /telltale:pending-review -->
+\`\`\`
+
+Rules for the block:
+- Always at the very top of the file, before the \`# Learnings\` heading.
+- If no candidates qualify, REMOVE any existing block.
+- If you're updating an existing block, replace it wholesale with the current candidate list.
+- The block is transient — when you read ${LEARNINGS_FILE} to make decisions in Step 5, IGNORE its contents.
+
+## Step 5 — update the body of learnings.md
+Bullet list under the \`# Learnings\` heading. Each entry: short rule (≤120 chars). Add parenthetical "(why: …)" only when the reason is non-obvious. Total body ≤50 lines. PREFER UPDATE/REFINE over ADD. REMOVE entries contradicted by the transcript. Every char here is loaded into every future session — be ruthless. (Do NOT add an approved learning here yourself — that's the user's call via the pending-review flow.)
 
 # How to commit
 When done (and only if anything actually changed), from ${MEMORY_ROOT}:
