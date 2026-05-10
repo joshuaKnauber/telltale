@@ -10,6 +10,7 @@ import {
   MEMORY_ROOT,
   POTENTIAL_FILE,
 } from "./memory.ts";
+import { runInitialScan } from "./initial-scan.ts";
 
 function step(msg: string) {
   console.log(`• ${msg}`);
@@ -83,7 +84,7 @@ function ensureClaudeMdImport() {
   step(`appended @import to ${GLOBAL_CLAUDE_MD}`);
 }
 
-function main() {
+export function runSetup(opts: { skipScan: boolean; limit: number }) {
   console.log("telltale setup\n");
   ensureMemoryDir();
   ensureLearningsFile();
@@ -91,6 +92,5 @@ function main() {
   ensureGitRepo();
   ensureClaudeMdImport();
   console.log("\nSetup complete.");
+  if (!opts.skipScan) runInitialScan(opts.limit);
 }
-
-main();

@@ -186,7 +186,8 @@ async function main() {
 
   const state = readState();
   const now = Date.now();
-  if (now - state.lastRunAt < MIN_INTERVAL_MS) {
+  const skipCooldown = process.env.TELLTALE_SKIP_COOLDOWN === "1";
+  if (!skipCooldown && now - state.lastRunAt < MIN_INTERVAL_MS) {
     log(`skip: last run ${Math.round((now - state.lastRunAt) / 1000)}s ago event=${eventName}`);
     process.exit(0);
   }
