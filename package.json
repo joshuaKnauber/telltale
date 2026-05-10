@@ -1,0 +1,20 @@
+{
+  "name": "telltale",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hook": "tsx src/hook.ts",
+    "setup": "tsx src/setup.ts",
+    "analyze": "tsx src/analyzer.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
