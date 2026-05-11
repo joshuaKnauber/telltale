@@ -1,11 +1,8 @@
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { join } from "node:path";
 
 export const MEMORY_ROOT = join(homedir(), ".telltale");
-export const TELLTALE_BIN = join(PROJECT_ROOT, "bin", "telltale");
+export const TELLTALE_BIN = "telltale";
 export const LEARNINGS_FILE = join(MEMORY_ROOT, "learnings.md");
 export const POTENTIAL_FILE = join(MEMORY_ROOT, "potential-learnings.md");
 export const GLOBAL_CLAUDE_MD = join(homedir(), ".claude", "CLAUDE.md");

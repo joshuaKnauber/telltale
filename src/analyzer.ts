@@ -163,10 +163,10 @@ When done (and only if anything actually changed), from ${MEMORY_ROOT}:
 Begin.`;
 }
 
-async function main() {
-  const transcriptPath = process.argv[2];
-  const eventName = process.argv[3] ?? "unknown";
-  const cwd = process.argv[4] ?? "";
+export async function runAnalyzerEntry(argv: string[]): Promise<void> {
+  const transcriptPath = argv[0];
+  const eventName = argv[1] ?? "unknown";
+  const cwd = argv[2] ?? "";
 
   if (!transcriptPath) {
     log("error: no transcript path");
@@ -175,13 +175,13 @@ async function main() {
 
   if (!existsSync(transcriptPath)) {
     log(`skip: transcript missing at ${transcriptPath}`);
-    process.exit(0);
+    return;
   }
 
   const size = statSync(transcriptPath).size;
   if (size < MIN_TRANSCRIPT_BYTES) {
     log(`skip: transcript too small (${size} bytes < ${MIN_TRANSCRIPT_BYTES}) event=${eventName}`);
-    process.exit(0);
+    return;
   }
 
   const state = readState();
@@ -189,7 +189,7 @@ async function main() {
   const skipCooldown = process.env.TELLTALE_SKIP_COOLDOWN === "1";
   if (!skipCooldown && now - state.lastRunAt < MIN_INTERVAL_MS) {
     log(`skip: last run ${Math.round((now - state.lastRunAt) / 1000)}s ago event=${eventName}`);
-    process.exit(0);
+    return;
   }
 
   log(`start event=${eventName} cwd=${cwd} transcript=${transcriptPath} bytes=${size}`);
@@ -233,8 +233,3 @@ async function main() {
   writeFileSync(transcriptOut, stdout);
   log(`done event=${eventName} elapsed=${elapsedMs}ms stdout=${stdout.length}b -> ${transcriptOut}`);
 }
-
-main().catch((err) => {
-  log(`uncaught: ${(err as Error).message}`);
-  process.exit(1);
-});

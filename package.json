@@ -1,24 +1,38 @@
 {
-  "name": "telltale",
+  "name": "@jknauber/telltale",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
+  "description": "Local memory loop for Claude Code: stages and promotes durable preferences across sessions.",
   "bin": {
-    "telltale": "./bin/telltale"
+    "telltale": "dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "hook": "tsx src/hook.ts",
+    "build": "rolldown -c && chmod +x dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "dev:link": "npm run build && npm link",
+    "dev:unlink": "npm unlink -g @jknauber/telltale",
     "telltale": "tsx src/cli.ts",
     "setup": "tsx src/cli.ts setup",
     "promote": "tsx src/cli.ts promote",
-    "analyze": "tsx src/analyzer.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "npm run build && changeset publish",
+    "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {
     "node": ">=20"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@types/node": "^22.0.0",
+    "rolldown": "^1.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
   },

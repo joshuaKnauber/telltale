@@ -48,8 +48,8 @@ After all edits:
 Begin.`;
 }
 
-function main() {
-  const instructions = process.argv[2] ?? "";
+export function runPromoteWorkerEntry(argv: string[]): void {
+  const instructions = argv[0] ?? "";
   if (!instructions.trim()) {
     log("error: empty instructions");
     process.exit(1);
@@ -92,5 +92,3 @@ function main() {
   writeFileSync(stdoutFile, stdout);
   log(`done elapsed=${elapsedMs}ms stdout=${stdout.length}b -> ${stdoutFile}`);
 }
-
-main();

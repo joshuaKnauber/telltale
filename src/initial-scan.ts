@@ -1,12 +1,7 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const TSX_BIN = resolve(HERE, "..", "node_modules", ".bin", "tsx");
-const ANALYZER_PATH = resolve(HERE, "analyzer.ts");
+import { join } from "node:path";
+import { spawnSelf } from "./self-spawn.ts";
 
 const PROJECTS_DIR = join(homedir(), ".claude", "projects");
 const MIN_TRANSCRIPT_BYTES = 4_000;
@@ -98,13 +93,11 @@ function startSpinner(label: () => string): () => void {
 
 function runOne(t: Transcript): { ok: boolean; elapsedMs: number; status: number | null } {
   const startedAt = Date.now();
-  const result = spawnSync(
-    TSX_BIN,
-    [ANALYZER_PATH, t.path, "InitialScan", t.cwd],
+  const result = spawnSelf(
+    ["__analyze", t.path, "InitialScan", t.cwd],
     {
       env: { ...process.env, TELLTALE_SKIP_COOLDOWN: "1" },
       stdio: ["ignore", "ignore", "pipe"],
-      encoding: "utf8",
     }
   );
   const elapsedMs = Date.now() - startedAt;

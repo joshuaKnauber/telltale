@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import {
   GLOBAL_CLAUDE_MD,
   IMPORT_LINE,
@@ -12,6 +14,27 @@ import {
 } from "./memory.ts";
 import { runInitialScan } from "./initial-scan.ts";
 import { runReview } from "./review-cli.ts";
+
+const CLAUDE_SETTINGS = join(homedir(), ".claude", "settings.json");
+const HOOK_EVENTS = ["SessionEnd", "PreCompact"] as const;
+const HOOK_COMMAND = "telltale __hook";
+const HOOK_TIMEOUT = 30;
+
+interface HookEntry {
+  type?: string;
+  command?: string;
+  timeout?: number;
+  [k: string]: unknown;
+}
+interface MatcherGroup {
+  matcher?: string;
+  hooks?: HookEntry[];
+  [k: string]: unknown;
+}
+interface SettingsJson {
+  hooks?: Record<string, MatcherGroup[]>;
+  [k: string]: unknown;
+}
 
 function step(msg: string) {
   console.log(`• ${msg}`);
@@ -85,6 +108,60 @@ function ensureClaudeMdImport() {
   step(`appended @import to ${GLOBAL_CLAUDE_MD}`);
 }
 
+function ensureClaudeHooks() {
+  let raw = "";
+  if (existsSync(CLAUDE_SETTINGS)) {
+    raw = readFileSync(CLAUDE_SETTINGS, "utf8");
+  }
+
+  let settings: SettingsJson = {};
+  if (raw.trim()) {
+    try {
+      settings = JSON.parse(raw);
+    } catch {
+      step(`warning: ${CLAUDE_SETTINGS} is not valid JSON; skipping hook install. Add manually:`);
+      console.log(`    SessionEnd, PreCompact → command "${HOOK_COMMAND}"`);
+      return;
+    }
+  }
+
+  mkdirSync(join(homedir(), ".claude"), { recursive: true });
+  settings.hooks = settings.hooks ?? {};
+
+  const ourGroup: MatcherGroup = {
+    matcher: "",
+    hooks: [{ type: "command", command: HOOK_COMMAND, timeout: HOOK_TIMEOUT }],
+  };
+
+  let changed = false;
+  for (const evt of HOOK_EVENTS) {
+    const existing = settings.hooks[evt] ?? [];
+    const others = existing.filter(
+      (g) => !(g.hooks ?? []).some((h) => (h.command ?? "").includes("telltale"))
+    );
+    const next = [...others, ourGroup];
+    if (JSON.stringify(existing) !== JSON.stringify(next)) {
+      settings.hooks[evt] = next;
+      changed = true;
+    }
+  }
+
+  if (!changed) {
+    step(`hooks already installed in ${CLAUDE_SETTINGS}`);
+    return;
+  }
+
+  writeFileSync(CLAUDE_SETTINGS, JSON.stringify(settings, null, 2) + "\n");
+  step(`installed SessionEnd + PreCompact hooks in ${CLAUDE_SETTINGS}`);
+
+  const onPath = spawnSync("which", ["telltale"], { stdio: "ignore" }).status === 0;
+  if (!onPath) {
+    step(
+      `warning: 'telltale' is not on PATH; hooks will fail until you 'npm i -g @jknauber/telltale' (or 'npm link' in dev).`
+    );
+  }
+}
+
 export async function runSetup(opts: { skipScan: boolean; limit: number }) {
   console.log("telltale setup\n");
   ensureMemoryDir();
@@ -92,6 +169,7 @@ export async function runSetup(opts: { skipScan: boolean; limit: number }) {
   ensurePotentialFile();
   ensureGitRepo();
   ensureClaudeMdImport();
+  ensureClaudeHooks();
   console.log("\nSetup complete.");
   if (opts.skipScan) return;
   runInitialScan(opts.limit);

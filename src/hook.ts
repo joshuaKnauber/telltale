@@ -1,7 +1,5 @@
-import { spawn } from "node:child_process";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { log } from "./state.ts";
+import { spawnSelfDetached } from "./self-spawn.ts";
 
 interface HookInput {
   session_id?: string;
@@ -10,10 +8,6 @@ interface HookInput {
   hook_event_name?: string;
   trigger?: string;
 }
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const ANALYZER_PATH = resolve(HERE, "analyzer.ts");
-const TSX_BIN = resolve(HERE, "..", "node_modules", ".bin", "tsx");
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -24,22 +18,14 @@ async function readStdin(): Promise<string> {
 }
 
 function spawnAnalyzerDetached(transcriptPath: string, eventName: string, cwd: string) {
-  const child = spawn(
-    TSX_BIN,
-    [ANALYZER_PATH, transcriptPath, eventName, cwd],
-    {
-      detached: true,
-      stdio: "ignore",
-    }
-  );
-  child.unref();
+  const child = spawnSelfDetached(["__analyze", transcriptPath, eventName, cwd]);
   log(`spawned analyzer pid=${child.pid} event=${eventName}`);
 }
 
-async function main() {
+export async function runHookEntry(): Promise<void> {
   if (process.env.TELLTALE_INTERNAL === "1") {
     log(`skip: TELLTALE_INTERNAL=1 (internal claude run, suppressing recursive hook)`);
-    process.exit(0);
+    return;
   }
 
   let input: HookInput = {};
@@ -48,7 +34,7 @@ async function main() {
     if (raw.trim()) input = JSON.parse(raw);
   } catch (err) {
     log(`failed to parse stdin: ${(err as Error).message}`);
-    process.exit(0);
+    return;
   }
 
   const event = input.hook_event_name ?? "?";
@@ -59,14 +45,8 @@ async function main() {
 
   if (!input.transcript_path) {
     log("skip: no transcript_path");
-    process.exit(0);
+    return;
   }
 
   spawnAnalyzerDetached(input.transcript_path, event, project);
-  process.exit(0);
 }
-
-main().catch((err) => {
-  log(`uncaught: ${(err as Error).message}`);
-  process.exit(0);
-});

@@ -4,6 +4,9 @@ import { MEMORY_ROOT } from "./memory.ts";
 import { runSetup } from "./setup.ts";
 import { runReview } from "./review-cli.ts";
 import { dispatchPromote, PROMOTE_LOG } from "./promote-dispatch.ts";
+import { runHookEntry } from "./hook.ts";
+import { runAnalyzerEntry } from "./analyzer.ts";
+import { runPromoteWorkerEntry } from "./promote-worker.ts";
 
 const setupCmd = defineCommand({
   meta: {
@@ -75,6 +78,48 @@ const promoteCmd = defineCommand({
   },
 });
 
+const internalHookCmd = defineCommand({
+  meta: {
+    name: "__hook",
+    description: "(internal) Claude Code SessionEnd / PreCompact hook entrypoint.",
+  },
+  async run() {
+    await runHookEntry();
+  },
+});
+
+const internalAnalyzeCmd = defineCommand({
+  meta: {
+    name: "__analyze",
+    description: "(internal) Analyze one transcript.",
+  },
+  args: {
+    transcriptPath: { type: "positional", required: true },
+    eventName: { type: "positional", required: false },
+    cwd: { type: "positional", required: false },
+  },
+  async run({ args }) {
+    await runAnalyzerEntry([
+      args.transcriptPath,
+      args.eventName ?? "unknown",
+      args.cwd ?? "",
+    ]);
+  },
+});
+
+const internalPromoteCmd = defineCommand({
+  meta: {
+    name: "__promote",
+    description: "(internal) Detached promote worker.",
+  },
+  args: {
+    instructions: { type: "positional", required: true },
+  },
+  run({ args }) {
+    runPromoteWorkerEntry([args.instructions]);
+  },
+});
+
 const main = defineCommand({
   meta: {
     name: "telltale",
@@ -85,6 +130,9 @@ const main = defineCommand({
     setup: setupCmd,
     review: reviewCmd,
     promote: promoteCmd,
+    __hook: internalHookCmd,
+    __analyze: internalAnalyzeCmd,
+    __promote: internalPromoteCmd,
   },
 });
 
