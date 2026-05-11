@@ -1,10 +1,9 @@
 # Telltale
 
-A quiet memory loop for Claude Code. Watches your sessions, extracts durable preferences, lets you confirm them, then makes Claude remember them in every future session.
+Telltale is a quiet memory loop for Claude Code. After each session ends, it reads the transcript, picks up the small signals that reveal how you actually work (corrections, repeated requests, things you push back on), and stages them as candidate preferences. When the pattern firms up, Claude raises it with you in your next session. You say yes or no. Approved entries land in `~/.telltale/learnings.md`, which is imported into every future Claude Code session.
 
-After a session ends, an analyzer reads the transcript and stages observations in `~/.telltale/potential-learnings.md`. Once a candidate has been seen enough times — across projects or repeatedly within one — Claude raises it with you in your next session. Approved entries move to `~/.telltale/learnings.md`, which is `@import`-ed into your global `~/.claude/CLAUDE.md` and loaded into every Claude Code session.
-
-Analysis runs through `claude -p` on your machine using your own auth. Nothing else is sent anywhere.
+> [!NOTE]
+> Runs locally. Analysis goes through your own `claude -p`. Nothing else leaves your machine.
 
 ## Quick Start
 
@@ -13,21 +12,28 @@ npm i -g @jknauber/telltale
 telltale setup
 ```
 
-`telltale setup` will:
+That's it. `telltale setup` will:
 
-- create `~/.telltale/` (memory dir + git repo)
-- add an `@import` line to your global `~/.claude/CLAUDE.md`
-- register `SessionEnd` and `PreCompact` hooks in `~/.claude/settings.json` so future sessions feed telltale automatically
-- analyze your most recent Claude Code session transcripts
-- walk you through any candidates it found, interactively
+- Create `~/.telltale/`, a small git-tracked memory dir for your learnings
+- Add an `@import` line to your global `~/.claude/CLAUDE.md` so confirmed preferences load into every session
+- Register `SessionEnd` and `PreCompact` hooks in `~/.claude/settings.json` so future sessions feed telltale on their own
+- Analyze your most recent Claude Code transcripts
+- Walk you through any candidates it surfaces, one at a time
+
+From there, you mostly forget about it. The hooks do the watching. Claude prompts you when a finding is ready to confirm. The rest stays out of the way.
 
 ## CLI
 
-- `telltale setup [--no-scan] [--limit <n>]` — initialize the memory dir, git repo, and `@import` line; optionally analyze the `<n>` most-recent transcripts (default 5).
-- `telltale review` — walk pending candidates interactively: accept, reject, investigate, or skip each. Accepted/rejected items are applied in a single detached worker.
-- `telltale promote "<instructions>"` — apply a free-text promote/reject instruction. Usually called by in-session Claude (when it surfaces a pending learning), not by hand.
+`telltale setup [--no-scan] [--limit <n>]`
+Initialize the memory dir, git repo, CLAUDE.md import, and hooks. Optionally analyze the `<n>` most recent transcripts (default 5).
 
-Internal subcommands (`telltale __hook`, `__analyze`, `__promote`) are entry points for the Claude Code hook and child processes; you don't invoke them directly.
+`telltale review`
+Walk pending candidates interactively. For each one: accept, reject, investigate, or skip. Decisions are batched into a single background worker that updates your files and commits.
+
+`telltale promote "<instructions>"`
+Apply a free-text promote/reject instruction. Usually invoked by in-session Claude when it surfaces a pending learning. You rarely call this by hand.
+
+Internal subcommands (`__hook`, `__analyze`, `__promote`) are entry points for the Claude Code hook and child processes. You don't invoke them yourself.
 
 ## Contribution
 
@@ -35,22 +41,22 @@ Internal subcommands (`telltale __hook`, `__analyze`, `__promote`) are entry poi
 git clone https://github.com/joshuaKnauber/telltale.git
 cd telltale
 npm install
-npm run dev:link        # builds + links `telltale` globally to this clone
+npm run dev:link
 ```
 
-After `dev:link`, the global `telltale` command points at your local `dist/cli.js`. Rebuild with `npm run build` to pick up changes. Run `npm run dev:unlink` to remove the link.
+`dev:link` builds and symlinks the global `telltale` command to this clone. Edit, then `npm run build` to pick changes up. `npm run dev:unlink` removes the link when you're done.
 
 Other scripts:
 
-- `npm run dev -- setup` — invoke the CLI via tsx without building (useful for quick iteration)
-- `npm run build` — bundle to `dist/cli.js`
-- `npm run typecheck`
+- `npm run dev -- setup` runs the CLI through tsx without building
+- `npm run build` bundles to `dist/cli.js` with Rolldown
+- `npm run typecheck` runs `tsc --noEmit`
 
 Releases use [Changesets](https://github.com/changesets/changesets):
 
-- `npx changeset` — describe what changed
-- `npm run version` — bump version + update changelog
-- `npm run release` — build and publish
+- `npx changeset` to describe what changed
+- `npm run version` to bump and update the changelog
+- `npm run release` to build and publish
 
 ## License
 
