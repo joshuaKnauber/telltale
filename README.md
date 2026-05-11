@@ -2,6 +2,8 @@
 
 Telltale is a quiet memory loop for Claude Code. After each session ends, it reads the transcript, picks up the small signals that reveal how you actually work (corrections, repeated requests, things you push back on), and stages them as candidate preferences. When the pattern firms up, Claude raises it with you in your next session. You say yes or no. Approved entries land in `~/.telltale/learnings.md`, which is imported into every future Claude Code session.
 
+Or skip waiting on Claude: run `telltale review` any time to walk pending findings yourself and confirm them in one pass.
+
 > [!NOTE]
 > Runs locally. Analysis goes through your own `claude -p`. Nothing else leaves your machine.
 
@@ -12,13 +14,19 @@ npm i -g @jknauber/telltale
 telltale setup
 ```
 
-That's it. `telltale setup` will:
+`telltale setup` will:
 
 - Create `~/.telltale/`, a small git-tracked memory dir for your learnings
 - Add an `@import` line to your global `~/.claude/CLAUDE.md` so confirmed preferences load into every session
 - Register `SessionEnd` and `PreCompact` hooks in `~/.claude/settings.json` so future sessions feed telltale on their own
 - Analyze your most recent Claude Code transcripts
-- Walk you through any candidates it surfaces, one at a time
+- Walk you through any candidates it surfaced
+
+To walk pending findings any time after that:
+
+```bash
+telltale review
+```
 
 From there, you mostly forget about it. The hooks do the watching. Claude prompts you when a finding is ready to confirm. The rest stays out of the way.
 
