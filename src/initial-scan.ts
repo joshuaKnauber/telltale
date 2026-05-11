@@ -91,7 +91,12 @@ function startSpinner(label: () => string): () => void {
   };
 }
 
-function runOne(t: Transcript): { ok: boolean; elapsedMs: number; status: number | null } {
+function runOne(t: Transcript): {
+  ok: boolean;
+  elapsedMs: number;
+  status: number | null;
+  errorMessage: string;
+} {
   const startedAt = Date.now();
   const result = spawnSelf(
     ["__analyze", t.path, "InitialScan", t.cwd],
@@ -101,11 +106,11 @@ function runOne(t: Transcript): { ok: boolean; elapsedMs: number; status: number
     }
   );
   const elapsedMs = Date.now() - startedAt;
-  return {
-    ok: !result.error && result.status === 0,
-    elapsedMs,
-    status: result.status,
-  };
+  const ok = !result.error && result.status === 0;
+  const errorMessage = result.error
+    ? result.error.message
+    : (result.stderr ?? "").trim();
+  return { ok, elapsedMs, status: result.status, errorMessage };
 }
 
 export function runInitialScan(limit: number): void {
@@ -146,10 +151,19 @@ export function runInitialScan(limit: number): void {
       console.log(
         `  ✗ ${tag} ${shortName(t)} · ${fmtDuration(r.elapsedMs)} · status=${r.status}`
       );
+      if (r.errorMessage) {
+        const lines = r.errorMessage.split("\n").slice(-5);
+        for (const line of lines) console.log(`      ${line}`);
+      }
     }
   }
 
   console.log(
     `\nDone in ${fmtDuration(Date.now() - totalStart)} — ${okCount} ok, ${failCount} failed.`
   );
+  if (failCount > 0) {
+    console.log(
+      `See ~/.claude/cache/telltale/analyzer.log for full per-run details.`
+    );
+  }
 }

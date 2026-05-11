@@ -217,11 +217,20 @@ export async function runAnalyzerEntry(argv: string[]): Promise<void> {
   const elapsedMs = Date.now() - startedAt;
 
   if (result.error) {
-    log(`error: ${result.error.message} (elapsed=${elapsedMs}ms)`);
+    const msg =
+      (result.error as NodeJS.ErrnoException).code === "ENOENT"
+        ? `'claude' CLI not found on PATH. Install Claude Code (https://claude.com/claude-code) and try again.`
+        : `failed to spawn 'claude': ${result.error.message}`;
+    log(`error: ${msg} (elapsed=${elapsedMs}ms)`);
+    console.error(`analyzer: ${msg}`);
     process.exit(1);
   }
   if (result.status !== 0) {
-    log(`claude exited ${result.status} (elapsed=${elapsedMs}ms): ${(result.stderr ?? "").slice(0, 300)}`);
+    const stderr = (result.stderr ?? "").trim();
+    log(`claude exited ${result.status} (elapsed=${elapsedMs}ms): ${stderr.slice(0, 300)}`);
+    console.error(
+      `analyzer: 'claude -p' exited ${result.status}${stderr ? `\n${stderr.slice(0, 600)}` : ""}`
+    );
     process.exit(1);
   }
 
