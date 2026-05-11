@@ -1,24 +1,9 @@
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { defineCommand, runMain } from "citty";
 import { MEMORY_ROOT } from "./memory.ts";
 import { runSetup } from "./setup.ts";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const TSX_BIN = resolve(HERE, "..", "node_modules", ".bin", "tsx");
-const PROMOTE_WORKER = resolve(HERE, "promote-worker.ts");
-
-const STATE_DIR = join(homedir(), ".claude", "cache", "telltale");
-const PROMOTE_LOG = join(STATE_DIR, "promote.log");
-
-function logPromote(line: string) {
-  mkdirSync(STATE_DIR, { recursive: true });
-  const stamp = new Date().toISOString();
-  writeFileSync(PROMOTE_LOG, `${stamp} ${line}\n`, { flag: "a" });
-}
+import { runReview } from "./review-cli.ts";
+import { dispatchPromote, PROMOTE_LOG } from "./promote-dispatch.ts";
 
 const setupCmd = defineCommand({
   meta: {
@@ -39,13 +24,24 @@ const setupCmd = defineCommand({
       default: "5",
     },
   },
-  run({ args }) {
+  async run({ args }) {
     const limit = Number(args.limit);
     if (!Number.isFinite(limit) || limit < 0) {
       console.error(`error: --limit must be a non-negative number (got ${args.limit})`);
       process.exit(2);
     }
-    runSetup({ skipScan: !args.scan, limit });
+    await runSetup({ skipScan: !args.scan, limit });
+  },
+});
+
+const reviewCmd = defineCommand({
+  meta: {
+    name: "review",
+    description:
+      "Walk through pending candidates in potential-learnings.md, accept/reject/investigate each, then dispatch a single combined promote worker in the background.",
+  },
+  async run() {
+    await runReview();
   },
 });
 
@@ -72,14 +68,9 @@ const promoteCmd = defineCommand({
       console.error(`error: memory root missing at ${MEMORY_ROOT}; run \`telltale setup\` first`);
       process.exit(1);
     }
-    const child = spawn(TSX_BIN, [PROMOTE_WORKER, instructions], {
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-    logPromote(`queued pid=${child.pid} instructions=${JSON.stringify(instructions)}`);
+    const pid = dispatchPromote(instructions);
     console.log(
-      `telltale: promote queued (running in background; tail ${PROMOTE_LOG} for status)`
+      `telltale: promote queued (pid ${pid ?? "?"}; tail ${PROMOTE_LOG} for status).`
     );
   },
 });
@@ -92,6 +83,7 @@ const main = defineCommand({
   },
   subCommands: {
     setup: setupCmd,
+    review: reviewCmd,
     promote: promoteCmd,
   },
 });

@@ -211,6 +211,7 @@ async function main() {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: ANALYZER_TIMEOUT_MS,
       encoding: "utf8",
+      env: { ...process.env, TELLTALE_INTERNAL: "1" },
     }
   );
   const elapsedMs = Date.now() - startedAt;

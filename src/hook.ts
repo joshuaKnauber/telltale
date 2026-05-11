@@ -37,6 +37,11 @@ function spawnAnalyzerDetached(transcriptPath: string, eventName: string, cwd: s
 }
 
 async function main() {
+  if (process.env.TELLTALE_INTERNAL === "1") {
+    log(`skip: TELLTALE_INTERNAL=1 (internal claude run, suppressing recursive hook)`);
+    process.exit(0);
+  }
+
   let input: HookInput = {};
   try {
     const raw = await readStdin();

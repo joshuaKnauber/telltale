@@ -72,6 +72,7 @@ function main() {
       stdio: ["ignore", "pipe", "pipe"],
       timeout: PROMOTE_TIMEOUT_MS,
       encoding: "utf8",
+      env: { ...process.env, TELLTALE_INTERNAL: "1" },
     }
   );
 
