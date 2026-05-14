@@ -1,6 +1,6 @@
 {
   "name": "@jknauber/telltale",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "Local memory loop for Claude Code: stages and promotes durable preferences across sessions.",
   "bin": {
