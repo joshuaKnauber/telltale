@@ -2,7 +2,7 @@
 
 Telltale is a quiet memory loop for Claude Code. After each session ends, it reads the transcript, picks up the small signals that reveal how you actually work (corrections, repeated requests, things you push back on), and stages them as candidate preferences. When the pattern firms up, Claude raises it with you in your next session. You say yes or no. Approved entries land in `~/.telltale/learnings.md`, which is imported into every future Claude Code session.
 
-Or skip waiting on Claude: run `telltale review` any time to walk pending findings yourself and confirm them in one pass.
+Want to see what's been picked up? Run `telltale review` any time to open a local UI showing confirmed learnings, pending candidates, recent runs, and commit history.
 
 > [!NOTE]
 > Runs locally. Analysis goes through your own `claude -p`. Nothing else leaves your machine.
@@ -20,9 +20,9 @@ telltale setup
 - Add an `@import` line to your global `~/.claude/CLAUDE.md` so confirmed preferences load into every session
 - Register `SessionEnd` and `PreCompact` hooks in `~/.claude/settings.json` so future sessions feed telltale on their own
 - Analyze your most recent Claude Code transcripts
-- Walk you through any candidates it surfaced
+- Open the UI so you can see what was picked up
 
-To walk pending findings any time after that:
+To open the UI any time after that:
 
 ```bash
 telltale review
@@ -36,7 +36,7 @@ From there, you mostly forget about it. The hooks do the watching. Claude prompt
 Initialize the memory dir, git repo, CLAUDE.md import, and hooks. Optionally analyze the `<n>` most recent transcripts (default 5).
 
 `telltale review`
-Walk pending candidates interactively. For each one: accept, reject, investigate, or skip. Decisions are batched into a single background worker that updates your files and commits.
+Launch the telltale UI on `http://localhost:5235` to browse confirmed learnings, potential candidates, recent runs, and commit history. The server runs in the foreground; press Ctrl-C to stop.
 
 `telltale promote "<instructions>"`
 Apply a free-text promote/reject instruction. Usually invoked by in-session Claude when it surfaces a pending learning. You rarely call this by hand.
@@ -57,7 +57,8 @@ npm run dev:link
 Other scripts:
 
 - `npm run dev -- setup` runs the CLI through tsx without building
-- `npm run build` bundles to `dist/cli.js` with Rolldown
+- `npm run build` builds the UI (`vite build` → `dist/ui/`) then bundles the CLI to `dist/cli.js` with Rolldown
+- `npm --prefix ui run dev` runs the UI dev server (Vite on 5234, API on 5235) for working on the UI
 - `npm run typecheck` runs `tsc --noEmit`
 
 Releases use [Changesets](https://github.com/changesets/changesets):
