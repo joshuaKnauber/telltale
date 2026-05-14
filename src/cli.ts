@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { defineCommand, runMain } from "citty";
 import { MEMORY_ROOT } from "./memory.ts";
 import { runSetup } from "./setup.ts";
-import { runReview } from "./review-cli.ts";
+import { runReview } from "./review-ui.ts";
 import { dispatchPromote, PROMOTE_LOG } from "./promote-dispatch.ts";
 import { runHookEntry } from "./hook.ts";
 import { runAnalyzerEntry } from "./analyzer.ts";
@@ -41,7 +41,7 @@ const reviewCmd = defineCommand({
   meta: {
     name: "review",
     description:
-      "Walk through pending candidates in potential-learnings.md, accept/reject/investigate each, then dispatch a single combined promote worker in the background.",
+      "Launch the telltale UI on http://localhost:5235 to browse confirmed learnings, potential candidates, recent runs, and commit history.",
   },
   async run() {
     await runReview();

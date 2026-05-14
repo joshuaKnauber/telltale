@@ -4,16 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n vite,api -c blue,green \"vite\" \"tsx watch server.ts\"",
+    "dev": "concurrently -n vite,api -c blue,green \"vite\" \"tsx watch dev-server.ts\"",
     "dev:vite": "vite",
-    "dev:api": "tsx watch server.ts",
-    "build": "tsc -b && vite build",
-    "start": "tsx server.ts",
+    "dev:api": "tsx watch dev-server.ts",
+    "build": "vite build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hono/node-server": "^1.13.7",
-    "hono": "^4.6.13",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

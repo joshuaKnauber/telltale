@@ -1,21 +1,105 @@
-import { Hono } from "hono";
-import { serve } from "@hono/node-server";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { homedir, userInfo } from "node:os";
-import { join } from "node:path";
-import type { AppState, Commit, Run } from "./src/types.ts";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Hono } from "hono";
+import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
+import { LEARNINGS_FILE, MEMORY_ROOT, POTENTIAL_FILE, GLOBAL_CLAUDE_MD } from "./memory.ts";
 
-const MEMORY_ROOT = join(homedir(), ".telltale");
-const LEARNINGS_FILE = join(MEMORY_ROOT, "learnings.md");
-const POTENTIAL_FILE = join(MEMORY_ROOT, "potential-learnings.md");
-const GLOBAL_CLAUDE_MD = join(homedir(), ".claude", "CLAUDE.md");
 const ANALYZER_LOG = join(homedir(), ".claude", "cache", "telltale", "analyzer.log");
 const SETTINGS_JSON = join(homedir(), ".claude", "settings.json");
 
-const app = new Hono();
+export interface AppState {
+  user: string;
+  paths: { learnings: string; potential: string; memoryRoot: string };
+  counts: { confirmed: number; potential: number; commits: number };
+  lastRun: { at: string | null; elapsedMs: number | null; event: string | null };
+  hooks: { sessionEnd: boolean; preCompact: boolean };
+  version: string;
+}
 
-app.get("/api/state", (c) => {
+interface Run {
+  startedAt: string;
+  finishedAt: string | null;
+  status: "done" | "running" | "skipped";
+  event: string;
+  elapsedMs: number | null;
+  stdoutBytes: number | null;
+  stdoutPath: string | null;
+  transcriptBytes: number | null;
+  cwd: string | null;
+  skipReason: string | null;
+}
+
+interface Commit {
+  hash: string;
+  shortHash: string;
+  date: string;
+  message: string;
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
+}
+
+function buildApp(uiRoot: string | null): Hono {
+  const app = new Hono();
+
+  app.get("/api/state", (c) => c.json(readState()));
+  app.get("/api/learnings", (c) => c.json(readFile(LEARNINGS_FILE)));
+  app.get("/api/potential", (c) => c.json(readFile(POTENTIAL_FILE)));
+  app.get("/api/runs", (c) => c.json({ runs: readRuns() }));
+  app.get("/api/history", (c) => c.json({ commits: readHistory() }));
+
+  if (uiRoot) {
+    app.use("*", serveStatic({ root: uiRoot }));
+    app.notFound((c) => {
+      const indexHtml = join(uiRoot, "index.html");
+      if (!existsSync(indexHtml)) return c.text("UI not built", 500);
+      return c.html(readFileSync(indexHtml, "utf8"));
+    });
+  }
+
+  return app;
+}
+
+export interface StartServerOptions {
+  port: number;
+  serveUi?: boolean;
+}
+
+export async function startServer(opts: StartServerOptions): Promise<void> {
+  const uiRoot = opts.serveUi === false ? null : resolveUiRoot();
+  if (opts.serveUi !== false && !uiRoot) {
+    throw new Error(
+      "telltale: UI assets not found. Run `npm run build` (or reinstall) before launching the UI."
+    );
+  }
+  const app = buildApp(uiRoot);
+  await new Promise<void>((resolve) => {
+    serve({ fetch: app.fetch, port: opts.port }, () => resolve());
+  });
+}
+
+function resolveUiRoot(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    join(here, "ui"),
+    join(here, "..", "ui", "dist"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(join(candidate, "index.html"))) return candidate;
+  }
+  return null;
+}
+
+function readFile(path: string): { content: string; path: string } {
+  const content = existsSync(path) ? readFileSync(path, "utf8") : "";
+  return { content, path };
+}
+
+function readState(): AppState {
   let confirmed = 0;
   let potentialCount = 0;
   let commits = 0;
@@ -25,16 +109,14 @@ app.get("/api/state", (c) => {
   let sessionEnd = false;
   let preCompact = false;
 
-  if (existsSync(LEARNINGS_FILE)) {
-    confirmed = countBullets(readFileSync(LEARNINGS_FILE, "utf8"));
-  }
-  if (existsSync(POTENTIAL_FILE)) {
-    potentialCount = countH3(readFileSync(POTENTIAL_FILE, "utf8"));
-  }
+  if (existsSync(LEARNINGS_FILE)) confirmed = countBullets(readFileSync(LEARNINGS_FILE, "utf8"));
+  if (existsSync(POTENTIAL_FILE)) potentialCount = countH3(readFileSync(POTENTIAL_FILE, "utf8"));
   if (existsSync(join(MEMORY_ROOT, ".git"))) {
     try {
-      const out = execSync("git rev-list --count HEAD", { cwd: MEMORY_ROOT, encoding: "utf8" });
-      commits = parseInt(out.trim(), 10) || 0;
+      commits = parseInt(
+        execSync("git rev-list --count HEAD", { cwd: MEMORY_ROOT, encoding: "utf8" }).trim(),
+        10
+      ) || 0;
     } catch {
       commits = 0;
     }
@@ -64,83 +146,19 @@ app.get("/api/state", (c) => {
   const claudeMd = existsSync(GLOBAL_CLAUDE_MD) ? readFileSync(GLOBAL_CLAUDE_MD, "utf8") : "";
   const importOk = claudeMd.includes(`@${LEARNINGS_FILE}`);
 
-  const state: AppState = {
+  return {
     user: prettyName(userInfo().username),
-    paths: {
-      learnings: LEARNINGS_FILE,
-      potential: POTENTIAL_FILE,
-      memoryRoot: MEMORY_ROOT,
-    },
-    counts: {
-      confirmed,
-      potential: potentialCount,
-      commits,
-    },
-    lastRun: {
-      at: lastRunAt,
-      elapsedMs: lastElapsed,
-      event: lastEvent,
-    },
-    hooks: {
-      sessionEnd: sessionEnd && importOk,
-      preCompact: preCompact && importOk,
-    },
+    paths: { learnings: LEARNINGS_FILE, potential: POTENTIAL_FILE, memoryRoot: MEMORY_ROOT },
+    counts: { confirmed, potential: potentialCount, commits },
+    lastRun: { at: lastRunAt, elapsedMs: lastElapsed, event: lastEvent },
+    hooks: { sessionEnd: sessionEnd && importOk, preCompact: preCompact && importOk },
     version: getHeadHash(),
   };
-  return c.json(state);
-});
+}
 
-app.get("/api/learnings", (c) => {
-  const content = existsSync(LEARNINGS_FILE) ? readFileSync(LEARNINGS_FILE, "utf8") : "";
-  return c.json({ content, path: LEARNINGS_FILE });
-});
-
-app.get("/api/potential", (c) => {
-  const content = existsSync(POTENTIAL_FILE) ? readFileSync(POTENTIAL_FILE, "utf8") : "";
-  return c.json({ content, path: POTENTIAL_FILE });
-});
-
-app.get("/api/runs", (c) => {
-  if (!existsSync(ANALYZER_LOG)) return c.json({ runs: [] });
+function readRuns(): Run[] {
+  if (!existsSync(ANALYZER_LOG)) return [];
   const raw = readFileSync(ANALYZER_LOG, "utf8");
-  return c.json({ runs: parseRuns(raw) });
-});
-
-app.get("/api/history", (c) => {
-  if (!existsSync(join(MEMORY_ROOT, ".git"))) return c.json({ commits: [] });
-  try {
-    const out = execSync(
-      "git log --pretty=format:%H%x09%cI%x09%s --shortstat -n 50",
-      { cwd: MEMORY_ROOT, encoding: "utf8" }
-    );
-    return c.json({ commits: parseGitLog(out) });
-  } catch {
-    return c.json({ commits: [] });
-  }
-});
-
-const PORT = Number(process.env.PORT ?? 5235);
-serve({ fetch: app.fetch, port: PORT }, (info) => {
-  console.log(`api listening on http://localhost:${info.port}`);
-});
-
-function countBullets(md: string): number {
-  let count = 0;
-  for (const line of md.split("\n")) {
-    if (line.trim().startsWith("- ")) count++;
-  }
-  return count;
-}
-
-function countH3(md: string): number {
-  let count = 0;
-  for (const line of md.split("\n")) {
-    if (line.trim().startsWith("### ")) count++;
-  }
-  return count;
-}
-
-function parseRuns(raw: string): Run[] {
   const runs: Run[] = [];
   const pending = new Map<string, Run[]>();
 
@@ -223,6 +241,19 @@ function parseRuns(raw: string): Run[] {
   return runs.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1));
 }
 
+function readHistory(): Commit[] {
+  if (!existsSync(join(MEMORY_ROOT, ".git"))) return [];
+  try {
+    const out = execSync(
+      "git log --pretty=format:%H%x09%cI%x09%s --shortstat -n 50",
+      { cwd: MEMORY_ROOT, encoding: "utf8" }
+    );
+    return parseGitLog(out);
+  } catch {
+    return [];
+  }
+}
+
 function parseGitLog(raw: string): Commit[] {
   const commits: Commit[] = [];
   const lines = raw.split("\n");
@@ -260,6 +291,22 @@ function parseGitLog(raw: string): Commit[] {
     i++;
   }
   return commits;
+}
+
+function countBullets(md: string): number {
+  let count = 0;
+  for (const line of md.split("\n")) {
+    if (line.trim().startsWith("- ")) count++;
+  }
+  return count;
+}
+
+function countH3(md: string): number {
+  let count = 0;
+  for (const line of md.split("\n")) {
+    if (line.trim().startsWith("### ")) count++;
+  }
+  return count;
 }
 
 function prettyName(login: string): string {

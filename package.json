@@ -10,7 +10,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "rolldown -c && chmod +x dist/cli.js",
+    "build": "npm --prefix ui run build && rolldown -c && chmod +x dist/cli.js",
+    "build:cli": "rolldown -c && chmod +x dist/cli.js",
+    "build:ui": "npm --prefix ui run build",
     "dev": "tsx src/cli.ts",
     "dev:link": "npm run build && npm link",
     "dev:unlink": "npm unlink -g @jknauber/telltale",
@@ -37,6 +39,8 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
-    "citty": "^0.2.2"
+    "@hono/node-server": "^1.13.7",
+    "citty": "^0.2.2",
+    "hono": "^4.6.13"
   }
 }

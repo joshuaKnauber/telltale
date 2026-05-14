@@ -13,7 +13,7 @@ import {
   POTENTIAL_FILE,
 } from "./memory.ts";
 import { runInitialScan } from "./initial-scan.ts";
-import { runReview } from "./review-cli.ts";
+import { runReview } from "./review-ui.ts";
 
 const CLAUDE_SETTINGS = join(homedir(), ".claude", "settings.json");
 const HOOK_EVENTS = ["SessionEnd", "PreCompact"] as const;
